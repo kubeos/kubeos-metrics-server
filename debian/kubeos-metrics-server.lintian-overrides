@@ -1,0 +1,3 @@
+
+# usr/bin/metrics-server is the upstream Go build; Go binaries are static by construction.
+kubeos-metrics-server: statically-linked-binary

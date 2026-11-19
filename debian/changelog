@@ -1,3 +1,9 @@
+kubeos-metrics-server (0.8.0-5) trixie; urgency=medium
+
+  * Override statically-linked-binary with its reason. Found by the new CI check.
+
+ -- KubeOS <mail@kubeos.in>  Fri, 20 Nov 2026 02:20:00 +0530
+
 kubeos-metrics-server (0.8.0-4) trixie; urgency=medium
 
   * Debian revision numbering: 0.8.0-1kubeos4 -> 0.8.0-4. The revision is a plain Debian one now
