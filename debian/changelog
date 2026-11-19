@@ -1,0 +1,7 @@
+kubeos-metrics-server (0.8.0-1kubeos1) trixie; urgency=medium
+
+  * Initial packaging: upstream metrics-server v0.8.0 (linux/amd64) plus the unit
+    that used to run /usr/local/bin/metrics-server. The binary is fetched and
+    checksum-verified at build time, exactly as build hook 9027 did.
+
+ -- KubeOS <mail@kubeos.in>  Thu, 19 Nov 2026 09:50:00 +0530

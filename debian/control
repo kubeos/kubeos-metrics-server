@@ -1,0 +1,20 @@
+Source: kubeos-metrics-server
+Section: admin
+Priority: optional
+Maintainer: KubeOS <mail@kubeos.in>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://kubeos.in/
+
+Package: kubeos-metrics-server
+Architecture: amd64
+Depends: ${misc:Depends}, ca-certificates
+Description: KubeOS metrics API (metrics-server as a host service)
+ The metrics API that makes "kubectl top" work, run as a systemd unit instead of the
+ usual Deployment, so a fresh node answers "kubectl top nodes" while "kubectl get pods
+ -A" is still empty - the KubeOS rule that the base system runs no Pods.
+ .
+ Upstream publishes no Debian package and a node has no registry after installation,
+ so the official release binary is fetched at build time, verified against a pinned
+ SHA256, and installed as /usr/bin/metrics-server.

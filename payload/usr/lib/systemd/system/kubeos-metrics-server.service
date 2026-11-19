@@ -1,0 +1,75 @@
+# KubeOS: the metrics API as a native systemd service (decision D5).
+#
+# metrics-server normally runs as a Deployment in kube-system. To keep
+# `kubectl get pods -A` empty on a fresh node it runs here as a host service instead
+# (binary baked by hook 9027), and the API server reaches it through a hand-made
+# Service + EndpointSlice that first boot creates:
+#
+#   kubectl top → API server → https://<metrics-server ClusterIP>:443
+#                            → kube-proxy DNAT → <node ip>:10443 → this process
+#                            → every kubelet's /stats/summary
+#
+# PORT 10443, NOT the 10250 the old Pod manifest used: inside a Pod's own network
+# namespace 10250 was free, but on the host it belongs to kubelet. Binding to
+# ${NODE_IP} keeps the endpoint off every other interface.
+#
+# Two different TLS decisions live in this one service, do not confuse them:
+#   1. The certificate THIS process serves is signed by the node CA, and the
+#      APIService carries that CA as its caBundle, so the API server verifies it
+#      properly. The upstream manifest instead sets insecureSkipTLSVerify: true
+#      because its cert is generated at startup and self-signed - a product must not
+#      ship that.
+#   2. --kubelet-insecure-tls is still needed and has nothing to do with (1): OUR
+#      kubelets serve self-signed certificates (serverTLSBootstrap is off), so the
+#      scraper has to skip verifying THEM (the trap recorded in AGENTS.md §14).
+#
+# Accepted trade-offs, same as kubeos-coredns: the EndpointSlice is static (single
+# node, static-IP installer), a node address change needs `systemctl restart
+# kubeos-metrics-server`, and there is no rolling upgrade of the metrics API.
+#
+# WHY THE REQUESTHEADER/CLIENT-CA FLAGS ARE SPELLED OUT HERE (measured 2026-11-11):
+# by default an aggregated API server reads those settings from the ConfigMap
+# kube-system/extension-apiserver-authentication. On a reboot this unit starts about
+# 0.2 s after kube-apiserver.service, and that read came back 403 while the API server
+# was still warming up - metrics-server panicked, systemd restarted it 5 s later and
+# everything worked, so every boot logged a panic for no reason. Passing the same
+# values as files (the CA bundle and the front-proxy CA the API server itself uses)
+# plus --authentication-skip-lookup=true removes the lookup, and with it the race.
+# A readiness gate in ExecStartPre was tried and reverted: it made the LOGIN PROMPT
+# wait for the metrics API (userspace 3.6 s -> 12.6 s), which is the wrong trade.
+[Unit]
+Description=KubeOS metrics API (metrics-server)
+Documentation=https://kubeos.in/
+ConditionPathExists=/etc/kubernetes/metrics-server.conf
+After=network-online.target kube-apiserver.service kube-proxy.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+# NODE_IP comes from the file every other unit shares.
+EnvironmentFile=/etc/kubeos/cluster-network.conf
+ExecStart=/usr/bin/metrics-server \
+    --bind-address=${NODE_IP} \
+    --secure-port=10443 \
+    --kubeconfig=/etc/kubernetes/metrics-server.conf \
+    --authentication-kubeconfig=/etc/kubernetes/metrics-server.conf \
+    --authorization-kubeconfig=/etc/kubernetes/metrics-server.conf \
+    --tls-cert-file=/etc/kubernetes/pki/kubeos/metrics-server.crt \
+    --tls-private-key-file=/etc/kubernetes/pki/kubeos/metrics-server.key \
+    --client-ca-file=/etc/kubernetes/pki/ca.crt \
+    --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt \
+    --requestheader-allowed-names=front-proxy-client \
+    --requestheader-extra-headers-prefix=X-Remote-Extra- \
+    --requestheader-group-headers=X-Remote-Group \
+    --requestheader-username-headers=X-Remote-User \
+    --authentication-skip-lookup=true \
+    --kubelet-insecure-tls \
+    --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname \
+    --kubelet-use-node-status-port \
+    --metric-resolution=15s
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

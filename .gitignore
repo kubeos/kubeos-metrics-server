@@ -1,0 +1,9 @@
+debian/files
+debian/*.substvars
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/kubeos-metrics-server/
+payload/usr/bin/metrics-server
+*.deb
+*.buildinfo
+*.changes

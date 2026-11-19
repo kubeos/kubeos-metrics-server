@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+# The upstream binary is fetched and checksum-verified here, not committed to git.
+override_dh_auto_build:
+	sh debian/fetch-upstream.sh $(CURDIR)/payload/usr/bin
+
+override_dh_installdeb:
+	dh_installdeb
+	: > debian/kubeos-metrics-server/DEBIAN/conffiles
